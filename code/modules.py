@@ -18,6 +18,7 @@ This module implements various modules of the network.
 You should fill in code into indicated sections.
 """
 import numpy as np
+import torch
 
 
 class LinearModule(object):
@@ -45,7 +46,12 @@ class LinearModule(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-
+        self.in_features, self.out_features = in_features, out_features
+        self.input_layer = input_layer
+        self.params = {"weight": np.random.randn(out_features, in_features) * np.sqrt(2. / in_features),
+                       "bias": np.zeros((out_features, 1))}
+        self.grads = {'weight': np.zeros((out_features, in_features)), 'bias': np.zeros((out_features, 1))}
+        self.x = np.zeros((in_features, 1))
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -68,7 +74,13 @@ class LinearModule(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-
+        if self.input_layer:
+            x = np.reshape(x, (x.shape[0], x.shape[1]*x.shape[2]*x.shape[3]))
+        self.x = x
+        assert x.shape[1] == self.params["weight"].shape[1], 'Linear Module: input data dimension does not match'
+        out = np.dot(x, self.params["weight"].T)
+        out += self.params["bias"].T
+        assert out.shape[1] == self.params["weight"].shape[0], 'Linear Module: output data dimension does not match'
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -92,7 +104,9 @@ class LinearModule(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-
+        self.grads['weight'] = np.dot(dout.T, self.x)
+        self.grads['bias'] = np.sum(dout.T, axis=1, keepdims=True)
+        dx = np.dot(dout, self.params['weight'])
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -109,7 +123,8 @@ class LinearModule(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        pass
+        self.grads['weight'] = np.zeros((self.out_features, self.in_features))
+        self.grads['bias'] = np.zeros((self.out_features, 1))
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -139,6 +154,9 @@ class ReLUModule(object):
         # PUT YOUR CODE HERE  #
         #######################
 
+        out = x * (x > 0)
+        self.x = x
+        assert x.shape == out.shape, "ReLU module"
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -160,7 +178,8 @@ class ReLUModule(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-
+        dx = (self.x > 0.)*1.
+        dx = dx * dout
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -206,7 +225,14 @@ class SoftMaxModule(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-
+        self.x = x # (batch_size, n_classes)
+        x_max = np.expand_dims(x.max(axis=1), axis=0).T # np.max(x, keepdims=True)
+        exps = np.exp(x - x_max)
+        sum_exps = np.expand_dims(np.sum(exps, axis=1) , axis=0).T
+        out = exps / sum_exps
+        self.softmax_out = out
+        assert x.shape == out.shape, "Softmax module in & out shapes do not match"
+        # assert out.sum(axis=1) == np.ones(out.shape[0])
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -228,7 +254,8 @@ class SoftMaxModule(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-
+        N = self.softmax_out.shape[1]
+        dx = self.softmax_out * (dout - np.matmul((dout * self.softmax_out), np.ones((N, N))))
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -274,6 +301,14 @@ class CrossEntropyModule(object):
         # PUT YOUR CODE HERE  #
         #######################
 
+        # Handle RuntimeWarning: divide by zero encountered in log
+        eps = np.zeros(y.shape) + 1e-10
+
+        p = x[range(len(y)), y]
+        p = np.maximum(eps, np.minimum(1 - eps, p))
+        assert p.shape == y.shape, str(p.shape) + ":" + str(y.shape)
+        out = -np.sum(np.log(p)) / y.shape[0]
+
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -296,6 +331,12 @@ class CrossEntropyModule(object):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
+        eps = np.zeros(x.shape) + 1e-10
+        x = np.maximum(eps, np.minimum(1 - eps, x))
+
+        T = np.zeros(x.shape)
+        T[np.arange(y.size), y] = 1
+        dx = -(1/y.shape[0]) * (T / x)
 
         #######################
         # END OF YOUR CODE    #

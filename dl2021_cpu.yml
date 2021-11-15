@@ -1,4 +1,4 @@
-name: dl2021
+name: dl2021_cpu
 channels:
   - pytorch
   - conda-forge
