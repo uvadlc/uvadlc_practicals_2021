@@ -55,12 +55,17 @@ def accuracy(predictions, targets):
     #######################
     # PUT YOUR CODE HERE  #
     #######################
-
+    correct = 0
+    for idx in range(len(targets)):
+        pred_class = np.argmax(predictions[idx], axis=0)
+        if pred_class == targets[idx]:
+            correct += 1
+    acc = correct / len(targets)
     #######################
     # END OF YOUR CODE    #
     #######################
-    
-    return accuracy
+
+    return acc
 
 
 def evaluate_model(model, data_loader):
@@ -83,11 +88,20 @@ def evaluate_model(model, data_loader):
     #######################
     # PUT YOUR CODE HERE  #
     #######################
+    model.eval()
+    predictions = np.empty((0, 10), int)
+    targets = np.empty((0), int)
+    for i, data in enumerate(data_loader, 0):
+        inputs, labels = data
+        outputs = model(inputs)
+        predictions = np.append(predictions, outputs.cpu().detach().numpy(), axis=0)
+        targets = np.append(targets, labels.cpu().detach().numpy(), axis=0)
 
+    avg_accuracy = accuracy(predictions=predictions, targets=targets)
     #######################
     # END OF YOUR CODE    #
     #######################
-    
+
     return avg_accuracy
 
 
@@ -146,15 +160,45 @@ def train(hidden_dims, lr, use_batch_norm, batch_size, epochs, seed, data_dir):
     #######################
 
     # TODO: Initialize model and loss module
-    model = ...
-    loss_module = ...
+    model = MLP(n_inputs=32 * 32 * 3, n_hidden=hidden_dims, n_classes=10, use_batch_norm=use_batch_norm)
+    loss_module = nn.CrossEntropyLoss()
     # TODO: Training loop including validation
     # TODO: Do optimization with the simple SGD optimizer
-    val_accuracies = ...
+    val_accuracies = []
+    model.train()
+    optimizer = optim.SGD(model.parameters(), lr=lr)  # , momentum=0.9)
+    for epoch in range(epochs):
+        running_loss = 0.0
+        for i, data in enumerate(cifar10_loader["train"], 0):
+            inputs, labels = data
+            optimizer.zero_grad()
+            outputs = model(inputs)
+
+            loss = loss_module(outputs, labels)
+            loss.backward()
+            optimizer.step()
+
+            # print statistics
+            running_loss += loss.item()
+
+        predictions = np.empty((0, 10), int)
+        targets = np.empty((0), int)
+        for i, val_data in enumerate(cifar10_loader["validation"], 0):
+            val_inputs, val_labels = val_data
+            val_outputs = model(val_inputs)
+
+            predictions = np.append(predictions, val_outputs.cpu().detach().numpy(), axis=0)
+            targets = np.append(targets, val_labels.cpu().detach().numpy(), axis=0)
+
+        epoch_acc = accuracy(predictions=predictions, targets=targets)
+        print("epochs: ", epoch, "epoch_accuracy = ", epoch_acc)
+        val_accuracies.append(epoch_acc)
+
     # TODO: Test best model
-    test_accuracy = ...
+    test_accuracy = evaluate_model(model, cifar10_loader["test"])
     # TODO: Add any information you might want to save for plotting
-    logging_info = ...
+    # logging_info = ...
+    logging_info = {}
     #######################
     # END OF YOUR CODE    #
     #######################
@@ -165,13 +209,13 @@ def train(hidden_dims, lr, use_batch_norm, batch_size, epochs, seed, data_dir):
 if __name__ == '__main__':
     # Command line arguments
     parser = argparse.ArgumentParser()
-    
+
     # Model hyperparameters
     parser.add_argument('--hidden_dims', default=[128], type=int, nargs='+',
                         help='Hidden dimensionalities to use inside the network. To specify multiple, use " " to separate them. Example: "256 128"')
     parser.add_argument('--use_batch_norm', action='store_true',
                         help='Use this option to add Batch Normalization layers to the MLP.')
-    
+
     # Optimizer hyperparameters
     parser.add_argument('--lr', default=0.1, type=float,
                         help='Learning rate to use')
@@ -191,4 +235,3 @@ if __name__ == '__main__':
 
     train(**kwargs)
     # Feel free to add any additional functions, such as plotting of the loss curve here
-    

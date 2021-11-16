@@ -59,7 +59,23 @@ class MLP(nn.Module):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-        pass
+        super(MLP, self).__init__()
+        self.n_inputs = n_inputs
+        self.n_hidden = n_hidden
+        self.n_classes = n_classes
+        self.layers = []
+
+        in_features = self.n_inputs
+        for out_features in self.n_hidden:
+            self.layers.append(nn.Linear(in_features, out_features))
+            self.layers.append(nn.ReLU())
+
+            in_features = out_features
+        self.layers.append(nn.Linear(out_features, self.n_classes))
+        self.layers.append(nn.Softmax())
+
+        self.model = nn.Sequential(*self.layers)
+        self.parameters = self.model.parameters
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -81,7 +97,8 @@ class MLP(nn.Module):
         #######################
         # PUT YOUR CODE HERE  #
         #######################
-
+        x = x.view(-1, x.shape[1] * x.shape[2] * x.shape[3])
+        out = self.model(x)
         #######################
         # END OF YOUR CODE    #
         #######################
@@ -94,4 +111,3 @@ class MLP(nn.Module):
         Returns the device on which the model is. Can be useful in some situations.
         """
         return next(self.parameters()).device
-    
