@@ -68,6 +68,8 @@ class MLP(nn.Module):
         in_features = self.n_inputs
         for out_features in self.n_hidden:
             self.layers.append(nn.Linear(in_features, out_features))
+            if use_batch_norm:
+                self.layers.append(nn.BatchNorm1d(out_features))
             self.layers.append(nn.ReLU())
 
             in_features = out_features
