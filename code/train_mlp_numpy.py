@@ -53,12 +53,18 @@ def accuracy(predictions, targets):
     #######################
     # PUT YOUR CODE HERE  #
     #######################
+    correct = 0
+    for idx in range(len(targets)):
+        pred_class = np.argmax(predictions[idx], axis=0)
+        if pred_class == targets[idx]:
+            correct += 1
+    acc = correct / len(targets)
 
     #######################
     # END OF YOUR CODE    #
     #######################
 
-    return accuracy
+    return acc
 
 
 def evaluate_model(model, data_loader):
@@ -81,7 +87,15 @@ def evaluate_model(model, data_loader):
     #######################
     # PUT YOUR CODE HERE  #
     #######################
+    predictions = np.empty((0, 10), int)
+    targets = np.empty((0), int)
+    for i, data in enumerate(data_loader, 0):
+        inputs, labels = data
+        outputs = model.forward(inputs)
+        predictions = np.append(predictions, outputs, axis=0)
+        targets = np.append(targets, labels, axis=0)
 
+    avg_accuracy = accuracy(predictions=predictions, targets=targets)
     #######################
     # END OF YOUR CODE    #
     #######################
@@ -94,7 +108,7 @@ def train(hidden_dims, lr, batch_size, epochs, seed, data_dir):
     Performs a full training cycle of MLP model.
 
     Args:
-      hidden_dims: A list of ints, specificying the hidden dimensionalities to use in the MLP.
+      hidden_dims: A list of ints, specifying the hidden dimensionalities to use in the MLP.
       lr: Learning rate of the SGD to apply.
       batch_size: Minibatch size for the data loaders.
       epochs: Number of training epochs to perform.
@@ -133,16 +147,52 @@ def train(hidden_dims, lr, batch_size, epochs, seed, data_dir):
     #######################
     # PUT YOUR CODE HERE  #
     #######################
-
+    print("Training started ... ")
     # TODO: Initialize model and loss module
-    model = ...
-    loss_module = ...
+    model = MLP(n_inputs=32*32*3, n_hidden=hidden_dims, n_classes=10)
+    loss_module = CrossEntropyModule()
     # TODO: Training loop including validation
-    val_accuracies = ...
+    val_accuracies = []
+    for epoch in range(epochs):
+        running_loss = 0.0
+        for i, data in enumerate(cifar10_loader["train"], 0):
+            inputs, labels = data
+            outputs = model.forward(inputs)
+
+            loss = loss_module.forward(outputs, labels)
+            dloss = loss_module.backward(outputs, labels)
+            model.backward(dloss)
+            # Update gradients
+            for l in range(len(model.layers)):
+                if hasattr(model.layers[l], 'params'):
+                    for key, value in model.layers[l].grads.items():
+                        model.layers[l].params[key] -= lr * value
+
+            model.clear_cache()
+
+            running_loss += loss
+        predictions = np.empty((0,10), int)
+        targets = np.empty((0), int)
+        for i, val_data in enumerate(cifar10_loader["validation"], 0):
+            val_inputs, val_labels = val_data
+            val_outputs = model.forward(val_inputs)
+
+            predictions = np.append(predictions, val_outputs, axis=0)
+            targets = np.append(targets, val_labels, axis=0)
+
+        epoch_acc = accuracy(predictions=predictions, targets=targets)
+        print("epochs: ", epoch, "epoch_accuracy = ", epoch_acc)
+        val_accuracies.append(epoch_acc)
+
+    print("val_accuracies = ", val_accuracies)
     # TODO: Test best model
-    test_accuracy = ...
+    #test_accuracy = ...
+    
+    test_accuracy = evaluate_model(model, cifar10_loader["test"])
+    print("TEST: ", test_accuracy)
     # TODO: Add any information you might want to save for plotting
-    logging_info = ...
+    #logging_info = ...
+    logging_dict = {}
     #######################
     # END OF YOUR CODE    #
     #######################
@@ -169,7 +219,7 @@ if __name__ == '__main__':
                         help='Max number of epochs')
     parser.add_argument('--seed', default=42, type=int,
                         help='Seed to use for reproducing results')
-    parser.add_argument('--data_dir', default='data/', type=str,
+    parser.add_argument('--data_dir', default='./data/', type=str,
                         help='Data directory where to store/find the CIFAR10 dataset.')
 
     args = parser.parse_args()
@@ -177,4 +227,3 @@ if __name__ == '__main__':
 
     train(**kwargs)
     # Feel free to add any additional functions, such as plotting of the loss curve here
-    
