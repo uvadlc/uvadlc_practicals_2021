@@ -26,6 +26,7 @@ import numpy as np
 import os
 from copy import deepcopy
 from tqdm.auto import tqdm
+import matplotlib.pyplot as plt
 from mlp_pytorch import MLP
 import cifar10_utils
 
@@ -88,11 +89,14 @@ def evaluate_model(model, data_loader):
     #######################
     # PUT YOUR CODE HERE  #
     #######################
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model.to(device)
     model.eval()
     predictions = np.empty((0, 10), int)
     targets = np.empty((0), int)
     for i, data in enumerate(data_loader, 0):
         inputs, labels = data
+        inputs, labels = inputs.to(device), labels.to(device)
         outputs = model(inputs)
         predictions = np.append(predictions, outputs.cpu().detach().numpy(), axis=0)
         targets = np.append(targets, labels.cpu().detach().numpy(), axis=0)
@@ -161,16 +165,24 @@ def train(hidden_dims, lr, use_batch_norm, batch_size, epochs, seed, data_dir):
 
     # TODO: Initialize model and loss module
     model = MLP(n_inputs=32 * 32 * 3, n_hidden=hidden_dims, n_classes=10, use_batch_norm=use_batch_norm)
+    model.to(device)
+    best_model = deepcopy(model)
+    best_val_acc = 0
     loss_module = nn.CrossEntropyLoss()
     # TODO: Training loop including validation
     # TODO: Do optimization with the simple SGD optimizer
     val_accuracies = []
+    train_accuracies = []
+    val_losses, train_losses = [], []
     model.train()
     optimizer = optim.SGD(model.parameters(), lr=lr)  # , momentum=0.9)
     for epoch in range(epochs):
-        running_loss = 0.0
+        train_running_loss = 0.0
+        train_predictions = np.empty((0, 10), int)
+        train_targets = np.empty((0), int)
         for i, data in enumerate(cifar10_loader["train"], 0):
             inputs, labels = data
+            inputs, labels = inputs.to(device), labels.to(device)
             optimizer.zero_grad()
             outputs = model(inputs)
 
@@ -178,32 +190,47 @@ def train(hidden_dims, lr, use_batch_norm, batch_size, epochs, seed, data_dir):
             loss.backward()
             optimizer.step()
 
-            # print statistics
-            running_loss += loss.item()
+            train_predictions = np.append(train_predictions, outputs.cpu().detach().numpy(), axis=0)
+            train_targets = np.append(train_targets, labels.cpu().detach().numpy(), axis=0)
+            train_running_loss += loss.item()
+
+        train_losses.append(train_running_loss / len(cifar10_loader["train"]))
+        train_epoch_acc = accuracy(predictions=train_predictions, targets=train_targets)
+        train_accuracies.append(train_epoch_acc)
 
         predictions = np.empty((0, 10), int)
         targets = np.empty((0), int)
+        val_running_loss = 0
         for i, val_data in enumerate(cifar10_loader["validation"], 0):
             val_inputs, val_labels = val_data
+            val_inputs, val_labels = val_inputs.to(device), val_labels.to(device)
             val_outputs = model(val_inputs)
+            val_loss = loss_module.forward(val_outputs, val_labels)
+            val_running_loss += val_loss.item()
 
             predictions = np.append(predictions, val_outputs.cpu().detach().numpy(), axis=0)
             targets = np.append(targets, val_labels.cpu().detach().numpy(), axis=0)
-
-        epoch_acc = accuracy(predictions=predictions, targets=targets)
-        print("epochs: ", epoch, "epoch_accuracy = ", epoch_acc)
-        val_accuracies.append(epoch_acc)
+        val_losses.append(val_running_loss / len(cifar10_loader["validation"]))
+        val_epoch_acc = accuracy(predictions=predictions, targets=targets)
+        print("epochs: ", epoch, "val_epoch_acc = ", val_epoch_acc, "train_epoch_acc = ", train_epoch_acc,
+              "val_loss=", val_loss.item(), "train_loss=", loss.item())
+        val_accuracies.append(val_epoch_acc)
+        if val_epoch_acc > best_val_acc:
+            best_model = deepcopy(model)
+            best_val_acc = val_epoch_acc
 
     # TODO: Test best model
-    test_accuracy = evaluate_model(model, cifar10_loader["test"])
+    test_accuracy = evaluate_model(best_model, cifar10_loader["test"])
+    print("TEST = ", test_accuracy)
     # TODO: Add any information you might want to save for plotting
-    # logging_info = ...
-    logging_info = {}
+    logging_info = {"train_accuracies": train_accuracies,
+                    "val_losses": val_losses,
+                    "train_losses": train_losses}
     #######################
     # END OF YOUR CODE    #
     #######################
 
-    return model, val_accuracies, test_accuracy, logging_info
+    return best_model, val_accuracies, test_accuracy, logging_info
 
 
 if __name__ == '__main__':
@@ -233,5 +260,23 @@ if __name__ == '__main__':
     args = parser.parse_args()
     kwargs = vars(args)
 
-    train(**kwargs)
+    model, val_accuracies, test_accuracy, logging_dict = train(**kwargs)
     # Feel free to add any additional functions, such as plotting of the loss curve here
+
+    print("Plotting ...")
+    train_accuracies = logging_dict["train_accuracies"]
+    val_losses = logging_dict["val_losses"]
+    train_losses = logging_dict["train_losses"]
+    fig, axs = plt.subplots(2)
+    x = [e + 1 for e in range(len(val_accuracies))]
+    axs[0].plot(x, val_accuracies, label='validaion')
+    axs[0].plot(x, train_accuracies, label='train')
+    axs[0].set_title("Validation and Train accuracies")
+    axs[0].legend()
+    axs[1].plot(x, val_losses, label='validaion')
+    axs[1].plot(x, train_losses, label='train')
+    axs[1].set_title("Validation and Train losses")
+    axs[1].legend()
+    fig.tight_layout()
+    fig.savefig('./mlp_pytorch_accuracy_loss_curves.png')
+    print("accuracy and loss curves saved in mlp_pytorch_accuracy_loss_curves.png")
