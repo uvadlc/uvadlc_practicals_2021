@@ -66,8 +66,9 @@ def train_models(results_filename):
         for use_bn in [True, False]:
             hidden_dims = list(map(int, hyperp.split(",")))
             model, val_accuracies, test_accuracy, logging_dict = \
-                train_mlp_pytorch.train(hidden_dims, lr=0.1, use_batch_norm=use_bn, batch_size=128, epochs=10, seed=42,
+                train_mlp_pytorch.train(hidden_dims, lr=0.1, use_batch_norm=use_bn, batch_size=128, epochs=20, seed=42,
                                         data_dir='data/')
+            results_dict[hyperp][use_bn] = logging_dict
 
     # TODO: Save all results in a file with the name 'results_filename'. This can e.g. by a json file
     with open(results_filename, 'w', encoding='utf-8') as f:
