@@ -223,7 +223,8 @@ def train(hidden_dims, lr, use_batch_norm, batch_size, epochs, seed, data_dir):
     test_accuracy = evaluate_model(best_model, cifar10_loader["test"])
     print("TEST = ", test_accuracy)
     # TODO: Add any information you might want to save for plotting
-    logging_info = {"train_accuracies": train_accuracies,
+    logging_info = {"val_accuracies": val_accuracies,
+                    "train_accuracies": train_accuracies,
                     "val_losses": val_losses,
                     "train_losses": train_losses}
     #######################
