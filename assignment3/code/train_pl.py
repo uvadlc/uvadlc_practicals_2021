@@ -165,8 +165,8 @@ def train_vae(args):
 
     os.makedirs(args.log_dir, exist_ok=True)
     train_loader, val_loader, test_loader = fmnist(batch_size=args.batch_size,
-                                                   num_workers=args.num_workers
-                                                   )
+                                                   num_workers=args.num_workers,
+                                                   root=args.data_dir)
 
     # Create a PyTorch Lightning trainer with the generation callback
     gen_callback = GenerateCallback(save_to_disk=True)
@@ -224,6 +224,8 @@ if __name__ == '__main__':
                         help='Minibatch size')
 
     # Other hyperparameters
+    parser.add_argument('--data_dir', default='../data/', type=str, 
+                        help='Directory where to look for the data. For jobs on Lisa, this should be $TMPDIR.')
     parser.add_argument('--epochs', default=80, type=int,
                         help='Max number of epochs')
     parser.add_argument('--seed', default=42, type=int,
