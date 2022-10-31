@@ -1,6 +1,6 @@
 # UvA Deep Learning 1 Course - Practicals
 
-This repository contains the code part of the three assignments of the Deep Learning 1 course, Fall 2021 edition. See the respective folders and ans-delft/Canvas for details on the assignment.
+This repository contains the code part of the three assignments of the Deep Learning 1 course, Fall 2022 edition. See the respective folders and ans-delft/Canvas for details on the assignment.
 
 ## Environment
 
